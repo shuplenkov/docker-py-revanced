@@ -92,6 +92,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build-apk:
+    needs: encrypt
     uses: ./.github/workflows/build-artifact.yml
     with:
       COMMIT_CHANGELOG: ${{ inputs.COMMIT_CHANGELOG }}
@@ -101,7 +102,32 @@ jobs:
       ENVS: ${{ secrets.ENVS }}
       DOCKER_PY_REVANCED_SECRETS: ${{ secrets.DOCKER_PY_REVANCED_SECRETS }}
       REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
-
+  encrypt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Encrypt secret and print base64(IV||ciphertext)
+        env:
+          PLAINTEXT: ${{ secrets.MY_SECRET }}
+          ENC_KEY: ${{ secrets.ENCRYPTION_KEY }} # должен быть 64 hex символа (32 байта)
+        run: |
+          set -eu
+          # проверим формат ключа
+          if ! echo -n "$ENC_KEY" | grep -E -q '^[0-9a-fA-F]{64}$'; then
+            echo "ERROR: ENCRYPTION_KEY must be 32 bytes in hex (64 hex chars)" >&2
+            exit 1
+          fi
+  
+          # сгенерировать IV (16 байт) в hex
+          IV_HEX=$(openssl rand -hex 16)
+          # raw IV (binary)
+          printf '%s' "$IV_HEX" | xxd -r -p > /tmp/iv.bin
+  
+          # зашифровать PLAINTEXT -> raw ciphertext (без base64)
+          printf '%s' "$PLAINTEXT" | openssl enc -aes-256-cbc -K "$ENC_KEY" -iv "$IV_HEX" -nosalt -out /tmp/ciph.bin
+  
+          # объединить IV || ciphertext и закодировать base64 для вывода
+          base64 /tmp/iv.bin /tmp/ciph.bin | tr -d '\n'
+          echo
   upload-to-github:
     name: GitHub Upload
     runs-on: ubuntu-latest
