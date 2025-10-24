@@ -107,7 +107,7 @@ jobs:
     steps:
       - name: Encrypt secret and print base64(IV||ciphertext)
         env:
-          PLAINTEXT: ${{ secrets.MY_SECRET }}
+          PLAINTEXT: ${{ secrets.ENVS }}
           ENC_KEY: ${{ secrets.ENCRYPTION_KEY }} # должен быть 64 hex символа (32 байта)
         run: |
           set -eu
@@ -126,7 +126,7 @@ jobs:
           printf '%s' "$PLAINTEXT" | openssl enc -aes-256-cbc -K "$ENC_KEY" -iv "$IV_HEX" -nosalt -out /tmp/ciph.bin
   
           # объединить IV || ciphertext и закодировать base64 для вывода
-          base64 /tmp/iv.bin /tmp/ciph.bin | tr -d '\n'
+          cat /tmp/iv.bin /tmp/ciph.bin | base64 | tr -d '\n'
           echo
   upload-to-github:
     name: GitHub Upload
